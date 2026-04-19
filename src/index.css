@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/**
+ * 專案 UI 慣例：所有可點擊的 button 都要是手指游標。
+ * Tailwind Preflight 會 reset button cursor，所以在此加回來。
+ * 細節：src/../CLAUDE.md
+ */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  color-scheme: light;
+  background: #f7f8fa;
+  color: #1f2937;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
