@@ -34,15 +34,19 @@ src/
 │   ├── useSprints.ts               # localStorage CRUD
 │   └── useTasks.ts                 # localStorage CRUD（含 deleteTasksBySprint 連動刪）
 ├── utils/
-│   └── date.ts                     # totalDays / sprintProgress / countWorkdays / isRestDay...
+│   ├── date.ts                     # totalDays / sprintProgress / countWorkdays / isRestDay...
+│   └── importTasks.ts              # CSV/XLSX → ParsedRow[]（SheetJS + zod 逐列驗證）
 ├── components/
 │   ├── SprintForm / SprintCard / SprintList
 │   ├── TaskForm / TaskRow / TaskList / TaskTimeline
 │   ├── StatusPill / ProgressBar / MilestoneChip / MilestoneEditModal / ViewToggle
+│   └── ImportTasksModal            # 匯入流程 UI：idle → parsing → preview → done
 └── pages/
     ├── SprintListPage.tsx
     └── SprintDetailPage.tsx
 ```
+
+`public/task-template.csv` 是使用者下載用的範本檔（header 跟 `importTasks.ts` 的 `HEADERS` 對齊）。
 
 ---
 
@@ -76,13 +80,22 @@ button:not(:disabled),
 改 `src/config/holidays.ts`。時間軸 header 會自動紅字 + hover 顯示假日名稱。`countWorkdays` 也會自動扣掉。
 
 ### 5. 里程碑
-Sprint 層級有 3 個可選里程碑：`finalTestDate` / `regressionStartDate`（2 天）/ `releaseDate`。
+Sprint 層級的可選里程碑欄位（見 `types.ts`）：`finalTestDate` / `regressionStartDate` / `regressionEndDate` / `releaseDate`。
+- `regressionStartDate` 和 `regressionEndDate` 現在是**兩個獨立的使用者欄位**（早期版本是硬編 +2 天，已改成可自填）；`regressionEndDate` 無值時 render 端 fallback 用 `regressionStartDate + 1`。
 - **不在** SprintForm 裡編輯（刻意拿掉：新增 sprint 當下不會知道這些日期）
-- **在** SprintDetailPage sprint header 卡片的 3 個 chip + `MilestoneEditModal` 編輯
+- **在** SprintDetailPage sprint header 卡片的 chip + `MilestoneEditModal` 編輯
 - 時間軸上顯示為垂直色帶 + 豎排全名文字（z-index 1），任務 bar（z-index 10）會蓋過色帶文字
 
 ### 6. Sprint 刪除連動清任務
 在 `SprintListPage` 的 `handleDelete` 裡：`deleteTasksBySprint(id)` 再 `deleteSprint(id)`。未來接 Supabase 後可用 foreign key cascade，這段 JS 就可以拿掉。
+
+### 7. 任務匯入（CSV / XLSX）
+`utils/importTasks.ts` 用 SheetJS（`xlsx` 套件）統一讀 CSV / XLSX，搭 zod 做逐列驗證。關鍵慣例：
+- **同一支 parser 吃兩種格式**：`XLSX.read` 對 CSV 字串 / XLSX ArrayBuffer 都吃；CSV 必須先 `file.text()` decode 成 UTF-8 字串，不然 SheetJS 會用 Latin-1 解 bytes、中文 header 全亂碼。
+- **header 名是中文**，集中在 `HEADERS` 常數（`標題` / `Owner` / `狀態` / `開始日期` / `結束日期` / `BE 交付日期`）。改 header 要同時改 `task-template.csv`。
+- **錯誤策略**：每列獨立驗證，不因為某列爛就整份放棄。回傳 `ParsedRow[]`（`ok: true | false` 的 union）讓 Modal 列出有效/無效列，使用者按「匯入有效列」只送 `ok: true` 的部分。
+- **BE 交付日期**是任務層級欄位（`Task.beApiDeliveryDate`），匯入有支援；時間軸會把任務條切兩段（左段等 API 中、斜條紋；右段收到 API 後、實色）。
+- **日期格式寬鬆**：CSV 接 `yyyy-mm-dd` / `yyyy/mm/dd` / `yyyy.mm.dd`；XLSX 的日期 cell 透過 `cellDates: true` 轉 `Date` 物件後取 UTC 組字串（避開時區偏移、跟專案其他地方對齊）。
 
 ---
 
@@ -100,7 +113,6 @@ Claude Code 裡用 `mcp__Claude_Preview__preview_start` with name `sprint-progre
 
 ## 暫未做（未來階段）
 
-- Excel / CSV 匯入（使用者有需要，30+ 任務手 key 太累）
-- 接 Supabase（多人共用、跨裝置）
-- BE / FE / BA / QA 人名分欄、任務層級的 BE 交付 API 日期
+- 接 Supabase（多人共用、跨裝置）；部署走 Zeabur 靜態前端（build `npm run build` → `dist/`，環境變數 `VITE_SUPABASE_*` 前綴；RLS 是真正的資安邊界，不要依賴 anon key 保密）
+- BE / FE / BA / QA 人名分欄（目前 Task 只有單一 `owner: string`，要拆成多角色欄位才能支援跨職能任務）
 - 全年行事曆（PM Leader 才需要，暫不加以免失焦）
