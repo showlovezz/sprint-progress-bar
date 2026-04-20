@@ -340,7 +340,15 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
 
       {unscheduled.length > 0 && (
         <div className="border-t border-slate-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-          還有 {unscheduled.length} 項任務沒有起迄日期，不會顯示在時間軸上。到「清單」檢視編輯補上日期。
+          還有 {unscheduled.length} 項任務沒有起迄日期，不會顯示在時間軸上：
+          {unscheduled.map((t, i) => (
+            <span key={t.id}>
+              {i > 0 && '、'}
+              <span className="font-semibold">「{t.title}」</span>
+              <span className="text-amber-700">（{t.owner}）</span>
+            </span>
+          ))}
+          。到「清單」檢視編輯補上日期。
         </div>
       )}
     </div>

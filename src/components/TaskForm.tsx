@@ -37,13 +37,15 @@ export function TaskForm({
 
     if (!t) return setError('標題不能空白');
     if (!o) return setError('Owner 不能空白');
-    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+    if (!startDate) return setError('開始日期為必填');
+    if (!endDate) return setError('結束日期為必填');
+    if (new Date(endDate) < new Date(startDate)) {
       return setError('結束日期不能早於開始日期');
     }
-    if (startDate && (startDate < sprintStartDate || startDate > sprintEndDate)) {
+    if (startDate < sprintStartDate || startDate > sprintEndDate) {
       return setError(`開始日期需落在 Sprint 區間內（${sprintStartDate} ~ ${sprintEndDate}）`);
     }
-    if (endDate && (endDate < sprintStartDate || endDate > sprintEndDate)) {
+    if (endDate < sprintStartDate || endDate > sprintEndDate) {
       return setError(`結束日期需落在 Sprint 區間內（${sprintStartDate} ~ ${sprintEndDate}）`);
     }
     if (beApiDeliveryDate && startDate && endDate) {
@@ -117,6 +119,7 @@ export function TaskForm({
             min={sprintStartDate}
             max={sprintEndDate}
             onChange={(e) => setStartDate(e.target.value)}
+            required
             className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </label>
@@ -128,6 +131,7 @@ export function TaskForm({
             min={sprintStartDate}
             max={sprintEndDate}
             onChange={(e) => setEndDate(e.target.value)}
+            required
             className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </label>
