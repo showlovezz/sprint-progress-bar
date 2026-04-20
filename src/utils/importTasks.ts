@@ -72,7 +72,11 @@ function isEmptyRow(row: Record<string, unknown>): boolean {
 function makeRowSchema(sprint: Sprint) {
   const { startDate: sStart, endDate: sEnd } = sprint;
 
-  const dateInSprint = (label: string, { required }: { required: boolean }) =>
+  /** @param allowBeyondEnd 允許日期晚於 sprint.endDate（用於跨 sprint 的結束日） */
+  const dateInSprint = (
+    label: string,
+    { required, allowBeyondEnd = false }: { required: boolean; allowBeyondEnd?: boolean }
+  ) =>
     z
       .string()
       .optional()
@@ -82,7 +86,10 @@ function makeRowSchema(sprint: Sprint) {
       .refine((v) => v !== INVALID_DATE, {
         message: `${label}格式不合法（需 yyyy-mm-dd 或 Excel 日期）`,
       })
-      .refine((v) => !v || (v >= sStart && v <= sEnd), {
+      .refine((v) => !v || v >= sStart, {
+        message: `${label}不能早於 Sprint 起始日 ${sStart}`,
+      })
+      .refine((v) => !v || allowBeyondEnd || v <= sEnd, {
         message: `${label}需在 ${sStart} ~ ${sEnd} 之內`,
       });
 
@@ -100,7 +107,7 @@ function makeRowSchema(sprint: Sprint) {
           }
         ),
       startDate: dateInSprint('開始日期', { required: true }),
-      endDate: dateInSprint('結束日期', { required: true }),
+      endDate: dateInSprint('結束日期', { required: true, allowBeyondEnd: true }),
       beApiDeliveryDate: dateInSprint('BE 交付日期', { required: false }),
     })
     .refine(

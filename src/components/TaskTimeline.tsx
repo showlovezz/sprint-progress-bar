@@ -285,21 +285,31 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
             if (r.kind !== 'task') return null;
             const { task, rowNum: row } = r;
             const startIdx = dayIndex.get(task.startDate!) ?? 0;
-            const endIdx = dayIndex.get(task.endDate!) ?? dayCount - 1;
+            const endDateInRange = dayIndex.has(task.endDate!);
+            const endIdx = endDateInRange
+              ? dayIndex.get(task.endDate!)!
+              : dayCount - 1;
+            // 結束日晚於 sprint 結束 → bar 視覺會 clip 在最後一欄，右側加「→ 實際結束日」標示
+            const extendsBeyond = !endDateInRange && task.endDate! > sprint.endDate;
             const beIdx = task.beApiDeliveryDate
               ? dayIndex.get(task.beApiDeliveryDate)
               : undefined;
             const showMarker =
               beIdx !== undefined && beIdx >= startIdx && beIdx <= endIdx;
             const baseColor = statusBarClass[task.status] ?? 'bg-slate-800';
-            const tooltip = showMarker
-              ? `${task.title}｜BE 交付 ${task.beApiDeliveryDate}`
-              : task.title;
+            const tooltipParts = [task.title];
+            if (extendsBeyond) {
+              tooltipParts.push(`結束 ${task.endDate}（跨 Sprint）`);
+            }
+            if (showMarker) {
+              tooltipParts.push(`BE 交付 ${task.beApiDeliveryDate}`);
+            }
+            const tooltip = tooltipParts.join('｜');
 
             return (
               <Fragment key={`bar-${task.id}`}>
                 <div
-                  className={`my-2 flex items-center justify-start overflow-hidden rounded-md px-2 text-xs font-medium text-white shadow-sm ${baseColor}`}
+                  className={`my-2 flex items-center justify-start gap-1 overflow-hidden rounded-md px-2 text-xs font-medium text-white shadow-sm ${baseColor}`}
                   style={{
                     gridRow: row,
                     gridColumnStart: 4 + startIdx,
@@ -311,7 +321,12 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
                   }}
                   title={tooltip}
                 >
-                  {task.title}
+                  <span className="truncate">{task.title}</span>
+                  {extendsBeyond && (
+                    <span className="ml-auto flex shrink-0 items-center gap-0.5 rounded bg-white/95 px-1.5 py-0.5 text-[10px] font-semibold text-slate-800 shadow-sm ring-1 ring-slate-300">
+                      → {formatShortDate(task.endDate!)}
+                    </span>
+                  )}
                 </div>
 
                 {/* BE 交付日小標籤：疊在 bar 上對應日期那一欄 */}
