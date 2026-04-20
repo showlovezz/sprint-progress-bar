@@ -3,12 +3,26 @@ import type { Task, TaskInput } from '../types';
 
 const STORAGE_KEY = 'sprint-progressbar.tasks';
 
+/** 舊 schema 的 `owner` 欄其實是「這張單的 FE 負責人」（因為這工具的語意一直以前端為主軸），
+ *  不是公司 Excel 的「Owner = PM」。所以 migration 走 owner → feOwners，pm 留空讓使用者補。
+ *  未來接 Supabase 時這段可以拿掉（遷移責任交給後端）。 */
+function migrateTask(raw: unknown): Task {
+  if (!raw || typeof raw !== 'object') return raw as Task;
+  const t = raw as Task & { owner?: string };
+  if (t.owner !== undefined && t.feOwners === undefined) {
+    const { owner, ...rest } = t;
+    return { ...rest, feOwners: [owner] } as Task;
+  }
+  return t;
+}
+
 function loadTasks(): Task[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(migrateTask);
   } catch {
     return [];
   }

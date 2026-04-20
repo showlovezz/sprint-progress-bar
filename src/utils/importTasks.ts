@@ -14,9 +14,11 @@ export type ParsedRow =
   | { ok: true; rowIndex: number; task: TaskInput; raw: Record<string, string> }
   | { ok: false; rowIndex: number; raw: Record<string, string>; errors: string[] };
 
+/** CSV/Excel 欄位名對應 — 欄位名沿用公司 Excel 的習慣（Owner 其實是 PM），
+ *  內部 schema 的欄位名另外定。 */
 const HEADERS = {
   title: '標題',
-  owner: 'Owner',
+  owner: 'Owner',  // → 內部 pm
   status: '狀態',
   startDate: '開始日期',
   endDate: '結束日期',
@@ -162,11 +164,12 @@ function parseRow(
   }
 
   const parsed = result.data;
+  // Excel 的 "Owner" 欄 = 內部的 PM（使用者明確要求 import 要自動對應）
   const task: TaskInput = {
     sprintId: sprint.id,
     title: parsed.title,
     status: (parsed.status ?? '待辦') as TaskStatus,
-    owner: parsed.owner,
+    pm: parsed.owner,
     startDate: parsed.startDate || undefined,
     endDate: parsed.endDate || undefined,
     beApiDeliveryDate: parsed.beApiDeliveryDate || undefined,

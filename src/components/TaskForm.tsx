@@ -20,7 +20,7 @@ export function TaskForm({
 }: Props) {
   const [title, setTitle] = useState(initial?.title ?? '');
   const [status, setStatus] = useState<TaskStatus>(initial?.status ?? '待辦');
-  const [owner, setOwner] = useState(initial?.owner ?? '');
+  const [pm, setPm] = useState(initial?.pm ?? '');
   const [startDate, setStartDate] = useState(initial?.startDate ?? sprintStartDate);
   const [endDate, setEndDate] = useState(initial?.endDate ?? sprintEndDate);
   const [beApiDeliveryDate, setBeApiDeliveryDate] = useState(
@@ -33,10 +33,10 @@ export function TaskForm({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const t = title.trim();
-    const o = owner.trim();
+    const p = pm.trim();
 
     if (!t) return setError('標題不能空白');
-    if (!o) return setError('Owner 不能空白');
+    if (!p) return setError('PM 不能空白');
     if (!startDate) return setError('開始日期為必填');
     if (!endDate) return setError('結束日期為必填');
     if (new Date(endDate) < new Date(startDate)) {
@@ -57,7 +57,16 @@ export function TaskForm({
       sprintId,
       title: t,
       status,
-      owner: o,
+      pm: p,
+      // 保留 initial 的多人欄位 / 其他日期 / jiraKey（下個版本這個 form 會直接編輯它們）
+      beOwners: initial?.beOwners,
+      feOwners: initial?.feOwners,
+      baOwners: initial?.baOwners,
+      qaOwners: initial?.qaOwners,
+      feExpectedCompleteDate: initial?.feExpectedCompleteDate,
+      plannedQaDate: initial?.plannedQaDate,
+      actualQaDate: initial?.actualQaDate,
+      jiraKey: initial?.jiraKey,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       beApiDeliveryDate: beApiDeliveryDate || undefined,
@@ -100,12 +109,12 @@ export function TaskForm({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">Owner</span>
+          <span className="font-medium text-slate-700">PM</span>
           <input
             type="text"
-            value={owner}
-            onChange={(e) => setOwner(e.target.value)}
-            placeholder="例：Vita"
+            value={pm}
+            onChange={(e) => setPm(e.target.value)}
+            placeholder="例：Maruko"
             className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </label>

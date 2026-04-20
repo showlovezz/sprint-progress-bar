@@ -12,18 +12,21 @@ export function TaskRow({ task, onEdit, onDelete }: Props) {
   return (
     <li className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:shadow-md">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-slate-900">
+        <p
+          className="truncate text-sm font-medium text-slate-900"
+          title={task.title}
+        >
           {task.title}
         </p>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Owner · {task.owner}
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
+          {task.pm && <span>PM · {task.pm}</span>}
+          {task.feOwners && task.feOwners.length > 0 && (
+            <span>FE · {task.feOwners.join(', ')}</span>
+          )}
           {task.beApiDeliveryDate && (
-            <>
-              {' · '}
-              <span className="text-slate-600">
-                BE 交付 {formatShortDate(task.beApiDeliveryDate)}
-              </span>
-            </>
+            <span className="text-slate-600">
+              BE 交付 {formatShortDate(task.beApiDeliveryDate)}
+            </span>
           )}
         </p>
       </div>

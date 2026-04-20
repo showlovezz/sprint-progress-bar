@@ -102,16 +102,19 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
     );
   }
 
-  // Group scheduled tasks by team
+  // Group scheduled tasks by team（依第一個 FE 成員分組；舊資料 fallback 到 pm）
+  const groupKeyOf = (t: Task) => t.feOwners?.[0] ?? t.pm ?? '';
   const byTeam = new Map<Team, Task[]>();
   for (const t of scheduled) {
-    const team = teamFor(t.owner);
+    const team = teamFor(groupKeyOf(t));
     if (!byTeam.has(team)) byTeam.set(team, []);
     byTeam.get(team)!.push(t);
   }
   for (const arr of byTeam.values()) {
     arr.sort((a, b) => {
-      if (a.owner !== b.owner) return a.owner.localeCompare(b.owner);
+      const ka = groupKeyOf(a);
+      const kb = groupKeyOf(b);
+      if (ka !== kb) return ka.localeCompare(kb);
       return (a.startDate ?? '').localeCompare(b.startDate ?? '');
     });
   }
@@ -152,7 +155,7 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
             style={{ gridRow: headerRow, gridColumn: 1, position: 'sticky', top: 0, zIndex: 20 }}
             className="border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm"
           >
-            Owner
+            PM / FE
           </div>
           <div
             style={{ gridRow: headerRow, gridColumn: 2, position: 'sticky', top: 0, zIndex: 20 }}
@@ -208,9 +211,20 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
               <Fragment key={`row-${task.id}`}>
                 <div
                   style={{ gridRow: row, gridColumn: 1 }}
-                  className="border-b border-r border-slate-100 bg-white px-3 py-2 text-sm text-slate-700"
+                  className="flex flex-col justify-center gap-0.5 border-b border-r border-slate-100 bg-white px-3 py-1.5 text-xs leading-tight"
                 >
-                  {task.owner}
+                  <div className="truncate text-slate-500">
+                    <span className="mr-1 text-[10px] font-semibold text-slate-400">PM</span>
+                    <span className="text-slate-700">{task.pm || '—'}</span>
+                  </div>
+                  <div className="truncate text-slate-500">
+                    <span className="mr-1 text-[10px] font-semibold text-slate-400">FE</span>
+                    <span className="font-medium text-slate-800">
+                      {task.feOwners && task.feOwners.length > 0
+                        ? task.feOwners.join(', ')
+                        : '—'}
+                    </span>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -356,13 +370,16 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
       {unscheduled.length > 0 && (
         <div className="border-t border-slate-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           還有 {unscheduled.length} 項任務沒有起迄日期，不會顯示在時間軸上：
-          {unscheduled.map((t, i) => (
-            <span key={t.id}>
-              {i > 0 && '、'}
-              <span className="font-semibold">「{t.title}」</span>
-              <span className="text-amber-700">（{t.owner}）</span>
-            </span>
-          ))}
+          {unscheduled.map((t, i) => {
+            const who = t.feOwners?.join(', ') || t.pm || '—';
+            return (
+              <span key={t.id}>
+                {i > 0 && '、'}
+                <span className="font-semibold">「{t.title}」</span>
+                <span className="text-amber-700">（{who}）</span>
+              </span>
+            );
+          })}
           。到「清單」檢視編輯補上日期。
         </div>
       )}

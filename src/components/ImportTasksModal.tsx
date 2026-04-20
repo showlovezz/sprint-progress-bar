@@ -312,7 +312,7 @@ function PreviewRow({ row }: { row: ParsedRow }) {
         <td className="px-2 py-2 text-xs text-slate-500">{row.rowIndex}</td>
         <td className="px-2 py-2 text-center text-green-600">✓</td>
         <td className="px-2 py-2 font-medium text-slate-900">{task.title}</td>
-        <td className="px-2 py-2 text-slate-700">{task.owner}</td>
+        <td className="px-2 py-2 text-slate-700">{task.pm}</td>
         <td className="px-2 py-2 text-slate-700">{task.status}</td>
         <td className="px-2 py-2 text-slate-600">{task.startDate ?? '—'}</td>
         <td className="px-2 py-2 text-slate-600">{task.endDate ?? '—'}</td>
