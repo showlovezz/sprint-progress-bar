@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { TASK_STATUSES, type Task, type TaskInput, type TaskStatus } from '../types';
+import { fromOwnersArray, toOwnersArray } from '../utils/owners';
 
 type Props = {
   sprintId: string;
@@ -9,19 +10,6 @@ type Props = {
   onSubmit: (input: TaskInput) => void;
   onCancel: () => void;
 };
-
-/** 多人字串轉陣列：支援逗號 / 頓號 / 分號分隔，去空白去空值 */
-function toOwnersArray(s: string): string[] {
-  return s
-    .split(/[，,、;；\n]/)
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-
-/** 陣列轉顯示字串 */
-function fromOwnersArray(arr?: string[]): string {
-  return (arr ?? []).join(', ');
-}
 
 const inputClass =
   'rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200';

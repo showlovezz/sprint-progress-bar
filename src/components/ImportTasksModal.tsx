@@ -280,17 +280,25 @@ function PreviewView({
 
       {/* Preview table */}
       <div className="overflow-x-auto rounded-lg border border-slate-200">
-        <table className="min-w-full text-sm">
+        <table className="min-w-full whitespace-nowrap text-sm">
           <thead className="bg-slate-50 text-xs font-medium text-slate-600">
             <tr>
               <th className="px-2 py-2 text-left">#</th>
               <th className="px-2 py-2 text-center">狀態</th>
               <th className="px-2 py-2 text-left">{HEADERS.title}</th>
-              <th className="px-2 py-2 text-left">{HEADERS.owner}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.jiraKey}</th>
               <th className="px-2 py-2 text-left">{HEADERS.status}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.owner}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.beOwners}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.feOwners}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.baOwners}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.qaOwners}</th>
               <th className="px-2 py-2 text-left">{HEADERS.startDate}</th>
               <th className="px-2 py-2 text-left">{HEADERS.endDate}</th>
               <th className="px-2 py-2 text-left">{HEADERS.beApiDeliveryDate}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.feExpectedCompleteDate}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.plannedQaDate}</th>
+              <th className="px-2 py-2 text-left">{HEADERS.actualQaDate}</th>
             </tr>
           </thead>
           <tbody>
@@ -304,6 +312,8 @@ function PreviewView({
   );
 }
 
+const PREVIEW_COL_COUNT = 16; // 同 thead th 數量（含 # 跟 ✓/✗），colSpan 用
+
 function PreviewRow({ row }: { row: ParsedRow }) {
   if (row.ok) {
     const { task } = row;
@@ -312,13 +322,19 @@ function PreviewRow({ row }: { row: ParsedRow }) {
         <td className="px-2 py-2 text-xs text-slate-500">{row.rowIndex}</td>
         <td className="px-2 py-2 text-center text-green-600">✓</td>
         <td className="px-2 py-2 font-medium text-slate-900">{task.title}</td>
-        <td className="px-2 py-2 text-slate-700">{task.pm}</td>
+        <td className="px-2 py-2 font-mono text-xs text-slate-600">{task.jiraKey ?? '—'}</td>
         <td className="px-2 py-2 text-slate-700">{task.status}</td>
+        <td className="px-2 py-2 text-slate-700">{task.pm}</td>
+        <td className="px-2 py-2 text-slate-700">{task.beOwners?.join(', ') ?? '—'}</td>
+        <td className="px-2 py-2 text-slate-700">{task.feOwners?.join(', ') ?? '—'}</td>
+        <td className="px-2 py-2 text-slate-700">{task.baOwners?.join(', ') ?? '—'}</td>
+        <td className="px-2 py-2 text-slate-700">{task.qaOwners?.join(', ') ?? '—'}</td>
         <td className="px-2 py-2 text-slate-600">{task.startDate ?? '—'}</td>
         <td className="px-2 py-2 text-slate-600">{task.endDate ?? '—'}</td>
-        <td className="px-2 py-2 text-slate-600">
-          {task.beApiDeliveryDate ?? '—'}
-        </td>
+        <td className="px-2 py-2 text-slate-600">{task.beApiDeliveryDate ?? '—'}</td>
+        <td className="px-2 py-2 text-slate-600">{task.feExpectedCompleteDate ?? '—'}</td>
+        <td className="px-2 py-2 text-slate-600">{task.plannedQaDate ?? '—'}</td>
+        <td className="px-2 py-2 text-slate-600">{task.actualQaDate ?? '—'}</td>
       </tr>
     );
   }
@@ -332,19 +348,35 @@ function PreviewRow({ row }: { row: ParsedRow }) {
         <td className="px-2 py-2 font-medium text-slate-900">
           {row.raw[HEADERS.title] || <em className="text-slate-400">(空)</em>}
         </td>
+        <td className="px-2 py-2 font-mono text-xs text-slate-600">
+          {row.raw[HEADERS.jiraKey] || '—'}
+        </td>
+        <td className="px-2 py-2 text-slate-700">{row.raw[HEADERS.status]}</td>
         <td className="px-2 py-2 text-slate-700">
           {row.raw[HEADERS.owner] || <em className="text-slate-400">(空)</em>}
         </td>
-        <td className="px-2 py-2 text-slate-700">{row.raw[HEADERS.status]}</td>
+        <td className="px-2 py-2 text-slate-700">{row.raw[HEADERS.beOwners] || '—'}</td>
+        <td className="px-2 py-2 text-slate-700">{row.raw[HEADERS.feOwners] || '—'}</td>
+        <td className="px-2 py-2 text-slate-700">{row.raw[HEADERS.baOwners] || '—'}</td>
+        <td className="px-2 py-2 text-slate-700">{row.raw[HEADERS.qaOwners] || '—'}</td>
         <td className="px-2 py-2 text-slate-600">{row.raw[HEADERS.startDate]}</td>
         <td className="px-2 py-2 text-slate-600">{row.raw[HEADERS.endDate]}</td>
         <td className="px-2 py-2 text-slate-600">
           {row.raw[HEADERS.beApiDeliveryDate]}
         </td>
+        <td className="px-2 py-2 text-slate-600">
+          {row.raw[HEADERS.feExpectedCompleteDate]}
+        </td>
+        <td className="px-2 py-2 text-slate-600">
+          {row.raw[HEADERS.plannedQaDate]}
+        </td>
+        <td className="px-2 py-2 text-slate-600">
+          {row.raw[HEADERS.actualQaDate]}
+        </td>
       </tr>
       <tr className="bg-rose-50/60">
         <td />
-        <td colSpan={7} className="px-2 pb-2 text-xs text-rose-700">
+        <td colSpan={PREVIEW_COL_COUNT - 1} className="px-2 pb-2 text-xs text-rose-700">
           {row.errors.map((err, i) => (
             <div key={i}>└ {err}</div>
           ))}
