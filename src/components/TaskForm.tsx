@@ -37,15 +37,15 @@ export function TaskForm({
 
     if (!t) return setError('標題不能空白');
     if (!o) return setError('Owner 不能空白');
-    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+    if (!startDate) return setError('開始日期為必填');
+    if (!endDate) return setError('結束日期為必填');
+    if (new Date(endDate) < new Date(startDate)) {
       return setError('結束日期不能早於開始日期');
     }
-    if (startDate && (startDate < sprintStartDate || startDate > sprintEndDate)) {
+    if (startDate < sprintStartDate || startDate > sprintEndDate) {
       return setError(`開始日期需落在 Sprint 區間內（${sprintStartDate} ~ ${sprintEndDate}）`);
     }
-    if (endDate && (endDate < sprintStartDate || endDate > sprintEndDate)) {
-      return setError(`結束日期需落在 Sprint 區間內（${sprintStartDate} ~ ${sprintEndDate}）`);
-    }
+    // 結束日期只擋「早於 sprint 起始」，允許晚於 sprint 結束（跨 sprint 大功能）
     if (beApiDeliveryDate && startDate && endDate) {
       if (beApiDeliveryDate < startDate || beApiDeliveryDate > endDate) {
         return setError('BE 交付 API 日需落在任務起迄區間內');
@@ -117,17 +117,23 @@ export function TaskForm({
             min={sprintStartDate}
             max={sprintEndDate}
             onChange={(e) => setStartDate(e.target.value)}
+            required
             className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">結束日期</span>
+          <span className="font-medium text-slate-700">
+            結束日期
+            <span className="ml-1 text-xs font-normal text-slate-500">
+              （可超過 Sprint 結束日，用於跨 Sprint 大功能）
+            </span>
+          </span>
           <input
             type="date"
             value={endDate}
             min={sprintStartDate}
-            max={sprintEndDate}
             onChange={(e) => setEndDate(e.target.value)}
+            required
             className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </label>

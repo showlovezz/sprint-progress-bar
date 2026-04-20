@@ -72,14 +72,24 @@ function isEmptyRow(row: Record<string, unknown>): boolean {
 function makeRowSchema(sprint: Sprint) {
   const { startDate: sStart, endDate: sEnd } = sprint;
 
-  const dateInSprint = (label: string) =>
+  /** @param allowBeyondEnd 允許日期晚於 sprint.endDate（用於跨 sprint 的結束日） */
+  const dateInSprint = (
+    label: string,
+    { required, allowBeyondEnd = false }: { required: boolean; allowBeyondEnd?: boolean }
+  ) =>
     z
       .string()
       .optional()
+      .refine((v) => !required || (v !== undefined && v !== INVALID_DATE), {
+        message: `${label}為必填`,
+      })
       .refine((v) => v !== INVALID_DATE, {
         message: `${label}格式不合法（需 yyyy-mm-dd 或 Excel 日期）`,
       })
-      .refine((v) => !v || (v >= sStart && v <= sEnd), {
+      .refine((v) => !v || v >= sStart, {
+        message: `${label}不能早於 Sprint 起始日 ${sStart}`,
+      })
+      .refine((v) => !v || allowBeyondEnd || v <= sEnd, {
         message: `${label}需在 ${sStart} ~ ${sEnd} 之內`,
       });
 
@@ -96,9 +106,9 @@ function makeRowSchema(sprint: Sprint) {
             message: `狀態必須是：${TASK_STATUSES.join(' / ')}`,
           }
         ),
-      startDate: dateInSprint('開始日期'),
-      endDate: dateInSprint('結束日期'),
-      beApiDeliveryDate: dateInSprint('BE 交付日期'),
+      startDate: dateInSprint('開始日期', { required: true }),
+      endDate: dateInSprint('結束日期', { required: true, allowBeyondEnd: true }),
+      beApiDeliveryDate: dateInSprint('BE 交付日期', { required: false }),
     })
     .refine(
       (v) => !v.startDate || !v.endDate || v.endDate >= v.startDate,
