@@ -58,7 +58,7 @@ export function SprintForm({ initial, existingCodes, onSubmit, onCancel }: Props
       className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
     >
       <h3 className="text-lg font-semibold text-slate-900">
-        {isEditing ? '編輯 Sprint' : '新增 Sprint'}
+        {isEditing ? `編輯 Sprint ${initial!.code}` : '新增 Sprint'}
       </h3>
       <p className="mt-1 text-xs text-slate-500">
         里程碑（進測 / 回歸 / 上線）進 Sprint 詳情頁再設定。
