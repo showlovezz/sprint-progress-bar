@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
 import { TASK_STATUSES, type Sprint, type TaskInput, type TaskStatus } from '../types';
+import { toOwnersArray } from './owners';
 
 /**
  * CSV / XLSX 匯入：一個檔案 → 一串 ParsedRow（逐列成功或失敗）。
@@ -14,14 +15,29 @@ export type ParsedRow =
   | { ok: true; rowIndex: number; task: TaskInput; raw: Record<string, string> }
   | { ok: false; rowIndex: number; raw: Record<string, string>; errors: string[] };
 
+/** CSV/Excel 主欄位名 — 沿用公司 Excel 的習慣（Owner 其實是內部的 PM）。
+ *  修 key 順序時記得同步 `ImportTasksModal` 的 preview table 跟 `public/task-template.csv`。 */
 const HEADERS = {
   title: '標題',
-  owner: 'Owner',
+  jiraKey: '工單',
   status: '狀態',
+  owner: 'Owner', // → 內部 pm
+  beOwners: 'BE',
+  feOwners: 'FE',
+  baOwners: 'BA',
+  qaOwners: 'QA',
   startDate: '開始日期',
   endDate: '結束日期',
-  beApiDeliveryDate: 'BE 交付日期',
+  beApiDeliveryDate: '後端預計完成日期',
+  feExpectedCompleteDate: '前端預計完成日期',
+  plannedQaDate: '預計進測日期',
+  actualQaDate: '實際進測日期',
 } as const;
+
+/** 向後相容：舊版 template / sample CSV 把後端預計完成日寫為「BE 交付日期」，要照舊能讀。 */
+const LEGACY_ALIAS: Record<string, string> = {
+  [HEADERS.beApiDeliveryDate]: 'BE 交付日期',
+};
 
 /** sentinel：normalizeDate 無法解析時回傳這個，讓 schema 辨識為錯誤格式。 */
 const INVALID_DATE = '__INVALID_DATE__';
@@ -64,9 +80,27 @@ function readCell(row: Record<string, unknown>, header: string): string {
   return String(v).trim();
 }
 
-/** 整列是否整個空白（所有欄位都 undefined/空字串）。 */
+/** 主 header 讀不到值就 fallback 到 legacy alias；回傳已 trim 過的字串或空字串。 */
+function readCellOrAlias(row: Record<string, unknown>, header: string): string {
+  const primary = readCell(row, header);
+  if (primary !== '') return primary;
+  const alias = LEGACY_ALIAS[header];
+  if (alias) return readCell(row, alias);
+  return '';
+}
+
+/** 同樣 alias fallback，但回傳 raw 值（讓 normalizeDate 能處理 Date 物件）。 */
+function readRawOrAlias(row: Record<string, unknown>, header: string): unknown {
+  const v = row[header];
+  if (v !== null && v !== undefined && v !== '') return v;
+  const alias = LEGACY_ALIAS[header];
+  if (alias) return row[alias];
+  return undefined;
+}
+
+/** 整列是否整個空白（所有主 header 都 undefined/空字串；legacy alias 不算）。 */
 function isEmptyRow(row: Record<string, unknown>): boolean {
-  return Object.values(HEADERS).every((h) => readCell(row, h) === '');
+  return Object.values(HEADERS).every((h) => readCellOrAlias(row, h) === '');
 }
 
 function makeRowSchema(sprint: Sprint) {
@@ -93,10 +127,20 @@ function makeRowSchema(sprint: Sprint) {
         message: `${label}需在 ${sStart} ~ ${sEnd} 之內`,
       });
 
+  /** 只驗日期格式、不驗是否在 sprint 區間內 — 用於「預計 / 實際進測」這類可能排到下個 sprint 的日期。 */
+  const dateFormatOnly = (label: string) =>
+    z
+      .string()
+      .optional()
+      .refine((v) => v !== INVALID_DATE, {
+        message: `${label}格式不合法（需 yyyy-mm-dd 或 Excel 日期）`,
+      });
+
   return z
     .object({
       title: z.string().min(1, '標題不能空白'),
       owner: z.string().min(1, 'Owner 不能空白'),
+      jiraKey: z.string().optional(),
       status: z
         .string()
         .optional()
@@ -106,9 +150,16 @@ function makeRowSchema(sprint: Sprint) {
             message: `狀態必須是：${TASK_STATUSES.join(' / ')}`,
           }
         ),
+      beOwnersRaw: z.string().optional(),
+      feOwnersRaw: z.string().optional(),
+      baOwnersRaw: z.string().optional(),
+      qaOwnersRaw: z.string().optional(),
       startDate: dateInSprint('開始日期', { required: true }),
       endDate: dateInSprint('結束日期', { required: true, allowBeyondEnd: true }),
-      beApiDeliveryDate: dateInSprint('BE 交付日期', { required: false }),
+      beApiDeliveryDate: dateInSprint('後端預計完成日期', { required: false }),
+      feExpectedCompleteDate: dateFormatOnly('前端預計完成日期'),
+      plannedQaDate: dateFormatOnly('預計進測日期'),
+      actualQaDate: dateFormatOnly('實際進測日期'),
     })
     .refine(
       (v) => !v.startDate || !v.endDate || v.endDate >= v.startDate,
@@ -116,13 +167,13 @@ function makeRowSchema(sprint: Sprint) {
     )
     .refine(
       (v) => {
-        // BE 交付日：若 task 有自己的範圍，要在範圍內；否則上面的 sprint 範圍已擋
+        // 後端預計完成日：若 task 有自己的範圍，要在範圍內；否則上面的 sprint 範圍已擋
         if (!v.beApiDeliveryDate) return true;
         if (v.startDate && v.beApiDeliveryDate < v.startDate) return false;
         if (v.endDate && v.beApiDeliveryDate > v.endDate) return false;
         return true;
       },
-      { message: 'BE 交付日期需落在任務起迄區間內', path: ['beApiDeliveryDate'] }
+      { message: '後端預計完成日期需落在任務起迄區間內', path: ['beApiDeliveryDate'] }
     );
 }
 
@@ -136,23 +187,27 @@ function parseRow(
   sprint: Sprint,
   schema: ReturnType<typeof makeRowSchema>
 ): ParsedRow {
-  // raw 留原字串給 Modal 顯示、也給錯誤列看得到原資料
-  const raw: Record<string, string> = {
-    [HEADERS.title]: readCell(row, HEADERS.title),
-    [HEADERS.owner]: readCell(row, HEADERS.owner),
-    [HEADERS.status]: readCell(row, HEADERS.status),
-    [HEADERS.startDate]: readCell(row, HEADERS.startDate),
-    [HEADERS.endDate]: readCell(row, HEADERS.endDate),
-    [HEADERS.beApiDeliveryDate]: readCell(row, HEADERS.beApiDeliveryDate),
-  };
+  // raw 留原字串給 Modal 顯示、也給錯誤列看得到原資料。保留 legacy fallback。
+  const raw: Record<string, string> = {};
+  (Object.values(HEADERS) as string[]).forEach((h) => {
+    raw[h] = readCellOrAlias(row, h);
+  });
 
   const candidate = {
     title: readCell(row, HEADERS.title),
     owner: readCell(row, HEADERS.owner),
+    jiraKey: readCell(row, HEADERS.jiraKey) || undefined,
     status: readCell(row, HEADERS.status) || undefined,
+    beOwnersRaw: readCell(row, HEADERS.beOwners) || undefined,
+    feOwnersRaw: readCell(row, HEADERS.feOwners) || undefined,
+    baOwnersRaw: readCell(row, HEADERS.baOwners) || undefined,
+    qaOwnersRaw: readCell(row, HEADERS.qaOwners) || undefined,
     startDate: normalizeDate(row[HEADERS.startDate]),
     endDate: normalizeDate(row[HEADERS.endDate]),
-    beApiDeliveryDate: normalizeDate(row[HEADERS.beApiDeliveryDate]),
+    beApiDeliveryDate: normalizeDate(readRawOrAlias(row, HEADERS.beApiDeliveryDate)),
+    feExpectedCompleteDate: normalizeDate(row[HEADERS.feExpectedCompleteDate]),
+    plannedQaDate: normalizeDate(row[HEADERS.plannedQaDate]),
+    actualQaDate: normalizeDate(row[HEADERS.actualQaDate]),
   };
 
   const result = schema.safeParse(candidate);
@@ -162,14 +217,28 @@ function parseRow(
   }
 
   const parsed = result.data;
+  const beOwners = parsed.beOwnersRaw ? toOwnersArray(parsed.beOwnersRaw) : [];
+  const feOwners = parsed.feOwnersRaw ? toOwnersArray(parsed.feOwnersRaw) : [];
+  const baOwners = parsed.baOwnersRaw ? toOwnersArray(parsed.baOwnersRaw) : [];
+  const qaOwners = parsed.qaOwnersRaw ? toOwnersArray(parsed.qaOwnersRaw) : [];
+
+  // Excel 的 "Owner" 欄 = 內部的 PM（使用者明確要求 import 要自動對應）
   const task: TaskInput = {
     sprintId: sprint.id,
     title: parsed.title,
     status: (parsed.status ?? '待辦') as TaskStatus,
-    owner: parsed.owner,
+    pm: parsed.owner,
+    jiraKey: parsed.jiraKey || undefined,
+    beOwners: beOwners.length > 0 ? beOwners : undefined,
+    feOwners: feOwners.length > 0 ? feOwners : undefined,
+    baOwners: baOwners.length > 0 ? baOwners : undefined,
+    qaOwners: qaOwners.length > 0 ? qaOwners : undefined,
     startDate: parsed.startDate || undefined,
     endDate: parsed.endDate || undefined,
     beApiDeliveryDate: parsed.beApiDeliveryDate || undefined,
+    feExpectedCompleteDate: parsed.feExpectedCompleteDate || undefined,
+    plannedQaDate: parsed.plannedQaDate || undefined,
+    actualQaDate: parsed.actualQaDate || undefined,
   };
   return { ok: true, rowIndex, task, raw };
 }

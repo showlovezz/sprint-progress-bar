@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { TASK_STATUSES, type Task, type TaskInput, type TaskStatus } from '../types';
+import { fromOwnersArray, toOwnersArray } from '../utils/owners';
 
 type Props = {
   sprintId: string;
@@ -9,6 +10,12 @@ type Props = {
   onSubmit: (input: TaskInput) => void;
   onCancel: () => void;
 };
+
+const inputClass =
+  'rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200';
+
+const labelSpanClass = 'font-medium text-slate-700';
+const hintClass = 'ml-1 text-xs font-normal text-slate-500';
 
 export function TaskForm({
   sprintId,
@@ -20,12 +27,22 @@ export function TaskForm({
 }: Props) {
   const [title, setTitle] = useState(initial?.title ?? '');
   const [status, setStatus] = useState<TaskStatus>(initial?.status ?? '待辦');
-  const [owner, setOwner] = useState(initial?.owner ?? '');
+  const [jiraKey, setJiraKey] = useState(initial?.jiraKey ?? '');
+  const [pm, setPm] = useState(initial?.pm ?? '');
+  const [be, setBe] = useState(fromOwnersArray(initial?.beOwners));
+  const [fe, setFe] = useState(fromOwnersArray(initial?.feOwners));
+  const [ba, setBa] = useState(fromOwnersArray(initial?.baOwners));
+  const [qa, setQa] = useState(fromOwnersArray(initial?.qaOwners));
   const [startDate, setStartDate] = useState(initial?.startDate ?? sprintStartDate);
   const [endDate, setEndDate] = useState(initial?.endDate ?? sprintEndDate);
   const [beApiDeliveryDate, setBeApiDeliveryDate] = useState(
     initial?.beApiDeliveryDate ?? ''
   );
+  const [feExpectedCompleteDate, setFeExpectedCompleteDate] = useState(
+    initial?.feExpectedCompleteDate ?? ''
+  );
+  const [plannedQaDate, setPlannedQaDate] = useState(initial?.plannedQaDate ?? '');
+  const [actualQaDate, setActualQaDate] = useState(initial?.actualQaDate ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const isEditing = Boolean(initial);
@@ -33,10 +50,10 @@ export function TaskForm({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const t = title.trim();
-    const o = owner.trim();
+    const p = pm.trim();
 
     if (!t) return setError('標題不能空白');
-    if (!o) return setError('Owner 不能空白');
+    if (!p) return setError('PM 不能空白');
     if (!startDate) return setError('開始日期為必填');
     if (!endDate) return setError('結束日期為必填');
     if (new Date(endDate) < new Date(startDate)) {
@@ -45,22 +62,33 @@ export function TaskForm({
     if (startDate < sprintStartDate || startDate > sprintEndDate) {
       return setError(`開始日期需落在 Sprint 區間內（${sprintStartDate} ~ ${sprintEndDate}）`);
     }
-    // 結束日期只擋「早於 sprint 起始」，允許晚於 sprint 結束（跨 sprint 大功能）
-    if (beApiDeliveryDate && startDate && endDate) {
-      if (beApiDeliveryDate < startDate || beApiDeliveryDate > endDate) {
-        return setError('BE 交付 API 日需落在任務起迄區間內');
-      }
+    // 結束日期允許晚於 sprint（跨 sprint 功能）— 只擋早於 sprint 起始
+    if (beApiDeliveryDate && (beApiDeliveryDate < startDate || beApiDeliveryDate > endDate)) {
+      return setError('後端預計完成日期需落在任務起迄區間內');
     }
 
     setError(null);
+    const beOwners = toOwnersArray(be);
+    const feOwners = toOwnersArray(fe);
+    const baOwners = toOwnersArray(ba);
+    const qaOwners = toOwnersArray(qa);
+
     onSubmit({
       sprintId,
       title: t,
       status,
-      owner: o,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
+      pm: p,
+      beOwners: beOwners.length > 0 ? beOwners : undefined,
+      feOwners: feOwners.length > 0 ? feOwners : undefined,
+      baOwners: baOwners.length > 0 ? baOwners : undefined,
+      qaOwners: qaOwners.length > 0 ? qaOwners : undefined,
+      jiraKey: jiraKey.trim() || undefined,
+      startDate,
+      endDate,
       beApiDeliveryDate: beApiDeliveryDate || undefined,
+      feExpectedCompleteDate: feExpectedCompleteDate || undefined,
+      plannedQaDate: plannedQaDate || undefined,
+      actualQaDate: actualQaDate || undefined,
     });
   };
 
@@ -74,23 +102,26 @@ export function TaskForm({
       </h3>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        {/* 標題 */}
         <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-          <span className="font-medium text-slate-700">標題</span>
+          <span className={labelSpanClass}>標題</span>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="例：登入優化"
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className={inputClass}
             autoFocus
           />
         </label>
+
+        {/* 狀態 / 工單 */}
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">狀態</span>
+          <span className={labelSpanClass}>狀態</span>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as TaskStatus)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className={`${inputClass} bg-white`}
           >
             {TASK_STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -100,17 +131,82 @@ export function TaskForm({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">Owner</span>
+          <span className={labelSpanClass}>
+            工單
+            <span className={hintClass}>（Jira key，例 TKW-22313）</span>
+          </span>
           <input
             type="text"
-            value={owner}
-            onChange={(e) => setOwner(e.target.value)}
-            placeholder="例：Vita"
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            value={jiraKey}
+            onChange={(e) => setJiraKey(e.target.value)}
+            placeholder="TKW-22313"
+            className={inputClass}
+          />
+        </label>
+
+        {/* 角色 */}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className={labelSpanClass}>PM</span>
+          <input
+            type="text"
+            value={pm}
+            onChange={(e) => setPm(e.target.value)}
+            placeholder="例：Maruko"
+            className={inputClass}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">開始日期</span>
+          <span className={labelSpanClass}>
+            BE<span className={hintClass}>（多人用逗號分隔）</span>
+          </span>
+          <input
+            type="text"
+            value={be}
+            onChange={(e) => setBe(e.target.value)}
+            placeholder="例：Eason, Marco"
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className={labelSpanClass}>
+            FE<span className={hintClass}>（多人用逗號分隔）</span>
+          </span>
+          <input
+            type="text"
+            value={fe}
+            onChange={(e) => setFe(e.target.value)}
+            placeholder="例：Jason, Paula"
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className={labelSpanClass}>
+            BA<span className={hintClass}>（多人用逗號分隔）</span>
+          </span>
+          <input
+            type="text"
+            value={ba}
+            onChange={(e) => setBa(e.target.value)}
+            placeholder="例：Tina, Yun"
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+          <span className={labelSpanClass}>
+            QA<span className={hintClass}>（多人用逗號分隔）</span>
+          </span>
+          <input
+            type="text"
+            value={qa}
+            onChange={(e) => setQa(e.target.value)}
+            placeholder="例：Wesker, Freedom, Ting"
+            className={inputClass}
+          />
+        </label>
+
+        {/* 日期 — start / end */}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className={labelSpanClass}>開始日期</span>
           <input
             type="date"
             value={startDate}
@@ -118,15 +214,13 @@ export function TaskForm({
             max={sprintEndDate}
             onChange={(e) => setStartDate(e.target.value)}
             required
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className={inputClass}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">
+          <span className={labelSpanClass}>
             結束日期
-            <span className="ml-1 text-xs font-normal text-slate-500">
-              （可超過 Sprint 結束日，用於跨 Sprint 大功能）
-            </span>
+            <span className={hintClass}>（可超過 Sprint 結束日，用於跨 Sprint 大功能）</span>
           </span>
           <input
             type="date"
@@ -134,35 +228,60 @@ export function TaskForm({
             min={sprintStartDate}
             onChange={(e) => setEndDate(e.target.value)}
             required
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className={inputClass}
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-          <span className="font-medium text-slate-700">
-            BE 交付 API 日
-            <span className="ml-1 text-xs font-normal text-slate-500">
-              （選填；純前/純後端任務可留白）
-            </span>
+
+        {/* 日期 — 關鍵節點 */}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className={labelSpanClass}>
+            後端預計完成日期
+            <span className={hintClass}>（= BE 交付 API 日；選填）</span>
           </span>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={beApiDeliveryDate}
-              min={startDate || sprintStartDate}
-              max={endDate || sprintEndDate}
-              onChange={(e) => setBeApiDeliveryDate(e.target.value)}
-              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-            {beApiDeliveryDate && (
-              <button
-                type="button"
-                onClick={() => setBeApiDeliveryDate('')}
-                className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-              >
-                清除
-              </button>
-            )}
-          </div>
+          <input
+            type="date"
+            value={beApiDeliveryDate}
+            min={startDate || sprintStartDate}
+            max={endDate || sprintEndDate}
+            onChange={(e) => setBeApiDeliveryDate(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className={labelSpanClass}>
+            前端預計完成日期
+            <span className={hintClass}>（選填）</span>
+          </span>
+          <input
+            type="date"
+            value={feExpectedCompleteDate}
+            onChange={(e) => setFeExpectedCompleteDate(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className={labelSpanClass}>
+            預計進測日期
+            <span className={hintClass}>（選填）</span>
+          </span>
+          <input
+            type="date"
+            value={plannedQaDate}
+            onChange={(e) => setPlannedQaDate(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className={labelSpanClass}>
+            實際進測日期
+            <span className={hintClass}>（選填）</span>
+          </span>
+          <input
+            type="date"
+            value={actualQaDate}
+            onChange={(e) => setActualQaDate(e.target.value)}
+            className={inputClass}
+          />
         </label>
       </div>
 

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useConfig } from '../hooks/useConfig';
 import { useSprints } from '../hooks/useSprints';
 import { useTasks } from '../hooks/useTasks';
+import { SettingsModal } from '../components/SettingsModal';
 import { SprintForm } from '../components/SprintForm';
 import { SprintList } from '../components/SprintList';
 import type { Sprint, SprintInput } from '../types';
@@ -14,7 +16,9 @@ type FormState =
 export function SprintListPage() {
   const { sprints, addSprint, updateSprint, deleteSprint } = useSprints();
   const { deleteTasksBySprint } = useTasks();
+  const { config, setConfig } = useConfig();
   const [formState, setFormState] = useState<FormState>({ mode: 'idle' });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -59,15 +63,26 @@ export function SprintListPage() {
               管理 sprint 編號與起迄日期，即時看到目前進度。
             </p>
           </div>
-          {formState.mode === 'idle' && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setFormState({ mode: 'create' })}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+              onClick={() => setSettingsOpen(true)}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50"
+              title="專案設定"
+              aria-label="專案設定"
             >
-              + 新增 Sprint
+              ⚙︎ 設定
             </button>
-          )}
+            {formState.mode === 'idle' && (
+              <button
+                type="button"
+                onClick={() => setFormState({ mode: 'create' })}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+              >
+                + 新增 Sprint
+              </button>
+            )}
+          </div>
         </header>
 
         {formState.mode !== 'idle' && (
@@ -94,6 +109,17 @@ export function SprintListPage() {
           />
         </div>
       </div>
+
+      {settingsOpen && (
+        <SettingsModal
+          config={config}
+          onSave={(patch) => {
+            setConfig((prev) => ({ ...prev, ...patch }));
+            setSettingsOpen(false);
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }

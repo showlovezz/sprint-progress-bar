@@ -9,11 +9,13 @@ import {
   isMonday,
   isRestDay,
 } from '../utils/date';
+import { jiraUrl } from '../utils/jira';
 import { StatusPill } from './StatusPill';
 
 type Props = {
   sprint: Sprint;
   tasks: Task[];
+  jiraBaseUrl?: string;
   onEdit: (task: Task) => void;
 };
 
@@ -81,7 +83,7 @@ function getMilestones(sprint: Sprint): MilestoneSpec[] {
   return out;
 }
 
-export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
+export function TaskTimeline({ sprint, tasks, jiraBaseUrl, onEdit }: Props) {
   const days = eachDayInRange(sprint.startDate, sprint.endDate);
   const dayCount = days.length;
   const dayIndex = new Map(days.map((d, i) => [d, i]));
@@ -102,16 +104,19 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
     );
   }
 
-  // Group scheduled tasks by team
+  // Group scheduled tasks by team（依第一個 FE 成員分組；舊資料 fallback 到 pm）
+  const groupKeyOf = (t: Task) => t.feOwners?.[0] ?? t.pm ?? '';
   const byTeam = new Map<Team, Task[]>();
   for (const t of scheduled) {
-    const team = teamFor(t.owner);
+    const team = teamFor(groupKeyOf(t));
     if (!byTeam.has(team)) byTeam.set(team, []);
     byTeam.get(team)!.push(t);
   }
   for (const arr of byTeam.values()) {
     arr.sort((a, b) => {
-      if (a.owner !== b.owner) return a.owner.localeCompare(b.owner);
+      const ka = groupKeyOf(a);
+      const kb = groupKeyOf(b);
+      if (ka !== kb) return ka.localeCompare(kb);
       return (a.startDate ?? '').localeCompare(b.startDate ?? '');
     });
   }
@@ -152,7 +157,7 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
             style={{ gridRow: headerRow, gridColumn: 1, position: 'sticky', top: 0, zIndex: 20 }}
             className="border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm"
           >
-            Owner
+            PM / FE
           </div>
           <div
             style={{ gridRow: headerRow, gridColumn: 2, position: 'sticky', top: 0, zIndex: 20 }}
@@ -208,19 +213,56 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
               <Fragment key={`row-${task.id}`}>
                 <div
                   style={{ gridRow: row, gridColumn: 1 }}
-                  className="border-b border-r border-slate-100 bg-white px-3 py-2 text-sm text-slate-700"
+                  className="flex flex-col justify-center gap-0.5 border-b border-r border-slate-100 bg-white px-3 py-1.5 text-xs leading-tight"
                 >
-                  {task.owner}
+                  <div className="truncate text-slate-500">
+                    <span className="mr-1 text-[10px] font-semibold text-slate-400">PM</span>
+                    <span className="text-slate-700">{task.pm || '—'}</span>
+                  </div>
+                  <div className="truncate text-slate-500">
+                    <span className="mr-1 text-[10px] font-semibold text-slate-400">FE</span>
+                    <span className="font-medium text-slate-800">
+                      {task.feOwners && task.feOwners.length > 0
+                        ? task.feOwners.join(', ')
+                        : '—'}
+                    </span>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onEdit(task)}
+                <div
                   style={{ gridRow: row, gridColumn: 2 }}
-                  className="border-b border-r border-slate-100 bg-white px-3 py-2 text-left text-sm font-medium text-slate-900 hover:bg-slate-50"
-                  title="點擊編輯"
+                  className="flex items-center gap-2 border-b border-r border-slate-100 bg-white px-3 py-2"
                 >
-                  {task.title}
-                </button>
+                  {task.jiraKey &&
+                    (() => {
+                      const href = jiraUrl(task.jiraKey, jiraBaseUrl);
+                      return href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100"
+                        >
+                          {task.jiraKey}
+                        </a>
+                      ) : (
+                        <span
+                          className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200"
+                          title="設定 Jira base URL 後會變成超連結"
+                        >
+                          {task.jiraKey}
+                        </span>
+                      );
+                    })()}
+                  <button
+                    type="button"
+                    onClick={() => onEdit(task)}
+                    className="min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-900 hover:text-blue-700"
+                    title="點擊編輯"
+                  >
+                    {task.title}
+                  </button>
+                </div>
                 <div
                   style={{ gridRow: row, gridColumn: 3 }}
                   className="flex items-center border-b border-r border-slate-100 bg-white px-3 py-2"
@@ -356,13 +398,16 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
       {unscheduled.length > 0 && (
         <div className="border-t border-slate-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           還有 {unscheduled.length} 項任務沒有起迄日期，不會顯示在時間軸上：
-          {unscheduled.map((t, i) => (
-            <span key={t.id}>
-              {i > 0 && '、'}
-              <span className="font-semibold">「{t.title}」</span>
-              <span className="text-amber-700">（{t.owner}）</span>
-            </span>
-          ))}
+          {unscheduled.map((t, i) => {
+            const who = t.feOwners?.join(', ') || t.pm || '—';
+            return (
+              <span key={t.id}>
+                {i > 0 && '、'}
+                <span className="font-semibold">「{t.title}」</span>
+                <span className="text-amber-700">（{who}）</span>
+              </span>
+            );
+          })}
           。到「清單」檢視編輯補上日期。
         </div>
       )}
