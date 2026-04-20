@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSprints } from '../hooks/useSprints';
 import { useTasks } from '../hooks/useTasks';
@@ -15,7 +15,14 @@ export function SprintListPage() {
   const { sprints, addSprint, updateSprint, deleteSprint } = useSprints();
   const { deleteTasksBySprint } = useTasks();
   const [formState, setFormState] = useState<FormState>({ mode: 'idle' });
+  const formRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (formState.mode !== 'idle') {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [formState]);
 
   const handleSubmit = (input: SprintInput) => {
     if (formState.mode === 'edit') {
@@ -64,7 +71,7 @@ export function SprintListPage() {
         </header>
 
         {formState.mode !== 'idle' && (
-          <div className="mt-6">
+          <div ref={formRef} className="mt-6 scroll-mt-6">
             <SprintForm
               key={formState.mode === 'edit' ? formState.sprint.id : 'new'}
               initial={formState.mode === 'edit' ? formState.sprint : undefined}
@@ -78,6 +85,9 @@ export function SprintListPage() {
         <div className="mt-8">
           <SprintList
             sprints={sprints}
+            editingSprintId={
+              formState.mode === 'edit' ? formState.sprint.id : null
+            }
             onOpenDetail={handleOpenDetail}
             onEdit={(sprint) => setFormState({ mode: 'edit', sprint })}
             onDelete={handleDelete}

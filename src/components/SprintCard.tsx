@@ -4,6 +4,7 @@ import { ProgressBar } from './ProgressBar';
 
 type Props = {
   sprint: Sprint;
+  isEditing?: boolean;
   onOpenDetail: (sprint: Sprint) => void;
   onEdit: (sprint: Sprint) => void;
   onDelete: (sprint: Sprint) => void;
@@ -15,7 +16,13 @@ const statusMeta = {
   done: { label: '已結束', dot: 'bg-green-500', tone: 'green' as const },
 };
 
-export function SprintCard({ sprint, onOpenDetail, onEdit, onDelete }: Props) {
+export function SprintCard({
+  sprint,
+  isEditing,
+  onOpenDetail,
+  onEdit,
+  onDelete,
+}: Props) {
   const progress = sprintProgress(sprint.startDate, sprint.endDate);
   const meta = statusMeta[progress.status];
 
@@ -27,7 +34,13 @@ export function SprintCard({ sprint, onOpenDetail, onEdit, onDelete }: Props) {
         : `第 ${progress.dayIndex} / ${progress.total} 天`;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+    <div
+      className={`rounded-xl border bg-white p-5 shadow-sm transition hover:shadow-md ${
+        isEditing
+          ? 'border-blue-500 ring-2 ring-blue-200'
+          : 'border-slate-200'
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
