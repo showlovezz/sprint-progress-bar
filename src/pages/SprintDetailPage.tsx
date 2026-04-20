@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useConfig } from '../hooks/useConfig';
 import { useSprints } from '../hooks/useSprints';
 import { useTasks } from '../hooks/useTasks';
 import { ImportTasksModal } from '../components/ImportTasksModal';
@@ -41,6 +42,7 @@ export function SprintDetailPage() {
   const { sprintId = '' } = useParams<{ sprintId: string }>();
   const { sprints, updateSprint } = useSprints();
   const { tasks, addTask, addTasks, updateTask, deleteTask } = useTasks(sprintId);
+  const { config } = useConfig();
   const [formState, setFormState] = useState<FormState>({ mode: 'idle' });
   const [view, setView] = useState<TaskView>('list');
   const [milestoneOpen, setMilestoneOpen] = useState(false);
@@ -233,6 +235,7 @@ export function SprintDetailPage() {
             {view === 'list' ? (
               <TaskList
                 tasks={tasks}
+                jiraBaseUrl={config.jiraBaseUrl}
                 onEdit={(task) => setFormState({ mode: 'edit', task })}
                 onDelete={handleDelete}
               />
@@ -240,6 +243,7 @@ export function SprintDetailPage() {
               <TaskTimeline
                 sprint={sprint}
                 tasks={tasks}
+                jiraBaseUrl={config.jiraBaseUrl}
                 onEdit={(task) => setFormState({ mode: 'edit', task })}
               />
             )}

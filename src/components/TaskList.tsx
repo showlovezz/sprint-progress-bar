@@ -4,6 +4,7 @@ import { TaskRow } from './TaskRow';
 
 type Props = {
   tasks: Task[];
+  jiraBaseUrl?: string;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
 };
@@ -16,7 +17,7 @@ const statusOrder: Record<string, number> = TASK_STATUSES.reduce(
   {} as Record<string, number>
 );
 
-export function TaskList({ tasks, onEdit, onDelete }: Props) {
+export function TaskList({ tasks, jiraBaseUrl, onEdit, onDelete }: Props) {
   if (tasks.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-8 text-center">
@@ -40,6 +41,7 @@ export function TaskList({ tasks, onEdit, onDelete }: Props) {
         <TaskRow
           key={task.id}
           task={task}
+          jiraBaseUrl={jiraBaseUrl}
           onEdit={onEdit}
           onDelete={onDelete}
         />

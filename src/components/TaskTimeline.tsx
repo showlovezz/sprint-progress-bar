@@ -9,11 +9,13 @@ import {
   isMonday,
   isRestDay,
 } from '../utils/date';
+import { jiraUrl } from '../utils/jira';
 import { StatusPill } from './StatusPill';
 
 type Props = {
   sprint: Sprint;
   tasks: Task[];
+  jiraBaseUrl?: string;
   onEdit: (task: Task) => void;
 };
 
@@ -81,7 +83,7 @@ function getMilestones(sprint: Sprint): MilestoneSpec[] {
   return out;
 }
 
-export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
+export function TaskTimeline({ sprint, tasks, jiraBaseUrl, onEdit }: Props) {
   const days = eachDayInRange(sprint.startDate, sprint.endDate);
   const dayCount = days.length;
   const dayIndex = new Map(days.map((d, i) => [d, i]));
@@ -226,15 +228,41 @@ export function TaskTimeline({ sprint, tasks, onEdit }: Props) {
                     </span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onEdit(task)}
+                <div
                   style={{ gridRow: row, gridColumn: 2 }}
-                  className="border-b border-r border-slate-100 bg-white px-3 py-2 text-left text-sm font-medium text-slate-900 hover:bg-slate-50"
-                  title="點擊編輯"
+                  className="flex items-center gap-2 border-b border-r border-slate-100 bg-white px-3 py-2"
                 >
-                  {task.title}
-                </button>
+                  {task.jiraKey &&
+                    (() => {
+                      const href = jiraUrl(task.jiraKey, jiraBaseUrl);
+                      return href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100"
+                        >
+                          {task.jiraKey}
+                        </a>
+                      ) : (
+                        <span
+                          className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200"
+                          title="設定 Jira base URL 後會變成超連結"
+                        >
+                          {task.jiraKey}
+                        </span>
+                      );
+                    })()}
+                  <button
+                    type="button"
+                    onClick={() => onEdit(task)}
+                    className="min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-900 hover:text-blue-700"
+                    title="點擊編輯"
+                  >
+                    {task.title}
+                  </button>
+                </div>
                 <div
                   style={{ gridRow: row, gridColumn: 3 }}
                   className="flex items-center border-b border-r border-slate-100 bg-white px-3 py-2"
